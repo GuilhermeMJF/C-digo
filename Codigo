@@ -1,0 +1,168 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_USUARIOS 100
+#define TAM_MAX 50
+#define CHAVE_CRIPTOGRAFIA 0xAA  // Chave para a criptografia XOR
+
+// Estrutura de usuário
+typedef struct {
+    char nome[TAM_MAX];
+    char senha[TAM_MAX];
+} Usuario;
+
+// Função para criptografar/descriptografar senha (XOR simples)
+void criptografar(char* str) {
+    int i;
+	for ( i = 0; str[i] != '\0'; i++) {
+        str[i] ^= CHAVE_CRIPTOGRAFIA;
+    }
+}
+
+// Função para salvar dados criptografados no arquivo
+void salvarDados(Usuario usuarios[], int qtdUsuarios) {
+    FILE* arquivo = fopen("usuarios.txt", "wb");
+    if (arquivo == NULL) {
+        printf("Erro ao abrir o arquivo para salvar dados.\n");
+        return;
+    }
+	int i;
+    for ( i = 0; i < qtdUsuarios; i++) {
+        criptografar(usuarios[i].senha);
+        fwrite(&usuarios[i], sizeof(Usuario), 1, arquivo);
+        criptografar(usuarios[i].senha);  // Descriptografando de volta após salvar
+    }
+
+    fclose(arquivo);
+}
+
+// Função para carregar dados do arquivo (dados criptografados)
+int carregarDados(Usuario usuarios[]) {
+    FILE* arquivo = fopen("usuarios.txt", "rb");
+    if (arquivo == NULL) {
+        return 0;
+    }
+
+    int i = 0;
+    while (fread(&usuarios[i], sizeof(Usuario), 1, arquivo) == 1) {
+        criptografar(usuarios[i].senha);  // Descriptografando após carregar
+        i++;
+    }
+
+    fclose(arquivo);
+    return i;
+}
+
+// Função para listar usuários
+void listarUsuarios(Usuario usuarios[], int qtdUsuarios) {
+    printf("\nLista de Usuários:\n");
+    int i;
+	for ( i = 0; i < qtdUsuarios; i++) {
+        printf("Nome: %s - Senha: %s\n", usuarios[i].nome, usuarios[i].senha);
+    }
+}
+
+// Função para incluir novo usuário
+void incluirUsuario(Usuario usuarios[], int* qtdUsuarios) {
+    if (*qtdUsuarios >= MAX_USUARIOS) {
+        printf("Limite de usuários atingido!\n");
+        return;
+    }
+
+    printf("Digite o nome do usuário: ");
+    fgets(usuarios[*qtdUsuarios].nome, TAM_MAX, stdin);
+    usuarios[*qtdUsuarios].nome[strcspn(usuarios[*qtdUsuarios].nome, "\n")] = '\0';  // Remove o \n no final
+
+    printf("Digite a senha do usuário: ");
+    fgets(usuarios[*qtdUsuarios].senha, TAM_MAX, stdin);
+    usuarios[*qtdUsuarios].senha[strcspn(usuarios[*qtdUsuarios].senha, "\n")] = '\0';
+
+    criptografar(usuarios[*qtdUsuarios].senha);  // Criptografa a senha antes de armazenar
+    (*qtdUsuarios)++;
+    salvarDados(usuarios, *qtdUsuarios);
+    printf("Usuário adicionado com sucesso!\n");
+}
+
+// Função para alterar senha de um usuário
+void alterarSenha(Usuario usuarios[], int qtdUsuarios) {
+    char nome[TAM_MAX];
+    printf("Digite o nome do usuário para alterar a senha: ");
+    fgets(nome, TAM_MAX, stdin);
+    nome[strcspn(nome, "\n")] = '\0';  // Remove o \n no final
+	int i;
+    for ( i = 0; i < qtdUsuarios; i++) {
+        if (strcmp(usuarios[i].nome, nome) == 0) {
+            printf("Digite a nova senha: ");
+            fgets(usuarios[i].senha, TAM_MAX, stdin);
+            usuarios[i].senha[strcspn(usuarios[i].senha, "\n")] = '\0';  // Remove o \n no final
+            criptografar(usuarios[i].senha);  // Criptografa a senha antes de salvar
+            salvarDados(usuarios, qtdUsuarios);
+            printf("Senha alterada com sucesso!\n");
+            return;
+        }
+    }
+    printf("Usuário não encontrado!\n");
+}
+
+// Função para excluir um usuário
+void excluirUsuario(Usuario usuarios[], int* qtdUsuarios) {
+    char nome[TAM_MAX];
+    printf("Digite o nome do usuário para excluir: ");
+    fgets(nome, TAM_MAX, stdin);
+    nome[strcspn(nome, "\n")] = '\0';  // Remove o \n no final
+	int i;
+    for ( i = 0; i < *qtdUsuarios; i++) {
+        if (strcmp(usuarios[i].nome, nome) == 0) {
+            int j;
+			for ( j = i; j < *qtdUsuarios - 1; j++) {
+                usuarios[j] = usuarios[j + 1];  // Move os elementos para "remover" o usuário
+            }
+            (*qtdUsuarios)--;
+            salvarDados(usuarios, *qtdUsuarios);
+            printf("Usuário excluído com sucesso!\n");
+            return;
+        }
+    }
+    printf("Usuário não encontrado!\n");
+}
+
+int main() {
+    Usuario usuarios[MAX_USUARIOS];
+    int qtdUsuarios = carregarDados(usuarios);  // Carrega os dados do arquivo
+    int opcao;
+
+    do {
+        printf("\nMenu de Gerenciamento de Usuários:\n");
+        printf("1. Incluir Usuário\n");
+        printf("2. Alterar Senha\n");
+        printf("3. Excluir Usuário\n");
+        printf("4. Listar Usuários\n");
+        printf("5. Sair\n");
+        printf("Escolha uma opção: ");
+        scanf("%d", &opcao);
+        getchar();  // Limpa o buffer do teclado
+
+        switch (opcao) {
+            case 1:
+                incluirUsuario(usuarios, &qtdUsuarios);
+                break;
+            case 2:
+                alterarSenha(usuarios, qtdUsuarios);
+                break;
+            case 3:
+                excluirUsuario(usuarios, &qtdUsuarios);
+                break;
+            case 4:
+                listarUsuarios(usuarios, qtdUsuarios);
+                break;
+            case 5:
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opção inválida! Tente novamente.\n");
+        }
+    } while (opcao != 5);
+
+    return 0;
+}
